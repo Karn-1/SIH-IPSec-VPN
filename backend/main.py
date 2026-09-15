@@ -33,9 +33,8 @@ def health_check() -> dict[str, str]:
 async def analyze_pcap(
     pcap: UploadFile | None = File(None),
     sa_log: UploadFile | None = File(None),
-    file: UploadFile | None = File(None),
 ) -> dict:
-    capture = pcap or file
+    capture = pcap
     if capture is None or not capture.filename:
         raise HTTPException(status_code=400, detail="No PCAP file provided.")
     if not capture.filename.lower().endswith((".pcap", ".pcapng", ".cap")):
@@ -75,7 +74,7 @@ async def analyze_pcap(
         response_features = {key: value for key, value in raw_features.items() if not key.startswith("_")}
         configuration = parse_sa_log(sa_path) if sa_path else unavailable_security_configuration()
         predictions = run_ml_prediction(response_features)
-        assessment = assess_security(configuration)
+        assessment = assess_security(configuration, response_features)
         notices = [] if configuration["available"] else [{"type": "warning", "code": "SA_LOG_NOT_PROVIDED", "message": "StrongSwan SA log was not provided. Security configuration fields requiring SA information could not be determined."}]
         return {
             "analysis": {"id": f"ANL-{uuid.uuid4().hex[:8].upper()}", "filename": capture.filename, "status": "completed", "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")},

@@ -1,8 +1,17 @@
-def assess_security(configuration: dict) -> dict:
-    """Apply only penalties for security values that are actually known."""
+def assess_security(configuration: dict, traffic_features: dict | None = None) -> dict:
+    """Score the configuration and packet evidence in a way that reflects real-world SA visibility.
+
+    Missing SA logs and signal-free captures should no longer occupy the same 100/secure
+    baseline as a fully parsed StrongSwan configuration.
+    """
     score = 100
     findings = []
     recommendations = []
+
+    if not configuration.get("available"):
+        score -= 35
+        findings.append({"severity": "warning", "title": "StrongSwan SA log not provided", "description": "No SA log was supplied, so the configuration could not be fully verified."})
+        recommendations.append({"priority": "high", "title": "Upload a StrongSwan SA log", "description": "Attach the SA log to reveal cipher, DH group, PFS, replay, and mode checks."})
 
     cipher = (configuration.get("cipher") or "").lower()
     if cipher in {"3des", "des"}:
@@ -32,8 +41,14 @@ def assess_security(configuration: dict) -> dict:
         score -= 10
         findings.append({"severity": "warning", "title": "SHA-1 detected", "description": "SHA-1 is present in the security configuration."})
 
-    if not configuration.get("available"):
-        findings.append({"severity": "warning", "title": "StrongSwan SA log not provided", "description": "Security configuration fields requiring SA information could not be determined."})
+    if traffic_features:
+        if traffic_features.get("esp_detected") is False and traffic_features.get("nat_t_detected") is False:
+            score -= 10
+            findings.append({"severity": "warning", "title": "No ESP/NAT-T evidence", "description": "The capture did not show a clear ESP or NAT-T tunnel signature."})
+        if traffic_features.get("packet_count", 0) < 20:
+            score -= 5
+            findings.append({"severity": "info", "title": "Sparse packet evidence", "description": "Too few packets were observed to make a high-confidence security assessment."})
+
     if configuration.get("available") and not findings:
         findings.append({"severity": "info", "title": "No known critical issues detected", "description": "No configured weakness was detected from the available evidence."})
         recommendations.append({"priority": "low", "title": "No critical remediation required", "description": "The detected configuration meets the current security checks."})

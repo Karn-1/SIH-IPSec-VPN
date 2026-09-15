@@ -41,7 +41,7 @@ const normalizeAnalysisResponse = (data) => ({
 
 export const analyzePcap = async (pcapFile, saLogFile = null) => {
   const formData = new FormData();
-  formData.append('file', pcapFile);
+  formData.append('pcap', pcapFile);
   
   if (saLogFile) {
     formData.append('sa_log', saLogFile);
